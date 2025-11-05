@@ -65,31 +65,23 @@ class BedrockClaudeLLM(BaseLLM):
         )
 
     def _count_tokens(self, text: str) -> int:
-        """Count tokens in a string using Claude's tokenizer.
+        """Count tokens in a string using a simple estimation.
 
         Args:
             text: Text to count tokens for
 
         Returns:
-            Token count
+            Token count (estimated)
+
+        Note:
+            Bedrock doesn't support the count_tokens API, so we use a simple estimation
+            based on character count. Claude typically uses ~4 characters per token.
         """
         if not text:
             return 0
 
-        try:
-            # Format text as a message for token counting
-            count = self.client.beta.messages.count_tokens(
-                model=self.model,
-                messages=[
-                    {"role": "user", "content": text}
-                ]
-            )
-            return count.input_tokens
-        except Exception as e:
-            # Log the error but don't fail
-            logging.warning(f"Failed to count tokens with Claude tokenizer: {e}")
-            # Fallback: rough estimate if tokenizer fails
-            return len(text.split()) * 1.3
+        # Simple estimation: ~4 characters per token for Claude
+        return int(len(text) / 4)
 
     def _count_messages_tokens(self, messages: List[Dict[str, str]], system_message: Optional[str] = None) -> int:
         """Count tokens in message list with optional system message.
@@ -99,46 +91,28 @@ class BedrockClaudeLLM(BaseLLM):
             system_message: Optional system message
 
         Returns:
-            Total token count
+            Total token count (estimated)
+
+        Note:
+            Bedrock doesn't support the count_tokens API, so we use simple estimation.
         """
         if not messages:
             return 0
 
-        # Convert messages to Claude format
-        claude_messages = [self._convert_to_claude_message(msg) for msg in messages
-                          if msg["role"] != "system"]
+        # Count tokens in all messages
+        total_tokens = 0
+        for msg in messages:
+            if "content" in msg and msg["content"]:
+                total_tokens += self._count_tokens(msg["content"])
 
-        # Format system message if provided
-        system_content = None
+        # Add system message tokens if provided
         if system_message:
-            system_content = system_message
+            total_tokens += self._count_tokens(system_message)
 
-        try:
-            # Use the API to count tokens for all messages at once
-            count = self.client.beta.messages.count_tokens(
-                model=self.model,
-                messages=claude_messages,
-                system=system_content
-            )
-            return count.input_tokens
-        except Exception as e:
-            # Log the error but don't fail
-            logging.warning(f"Failed to count tokens with Claude tokenizer: {e}")
+        # Add overhead for message formatting (~10 tokens per message)
+        total_tokens += 10 * len(messages)
 
-            # Fallback: count tokens individually
-            total_tokens = 0
-            for msg in claude_messages:
-                if "content" in msg and msg["content"]:
-                    total_tokens += self._count_tokens(msg["content"])
-
-            # Add system message tokens if provided
-            if system_message:
-                total_tokens += self._count_tokens(system_message)
-
-            # Add overhead for message formatting
-            total_tokens += 10 * len(claude_messages)  # Add ~10 tokens per message for formatting
-
-            return total_tokens
+        return total_tokens
 
     def generate(
         self,
