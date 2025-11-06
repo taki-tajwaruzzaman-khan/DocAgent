@@ -257,6 +257,14 @@ def create_app(debug=True):
             'is_running': app.config['APP_STATE']['is_running'],
             'repo_path': app.config['APP_STATE']['repo_path']
         })
+
+    @app.route('/api/reset', methods=['POST'])
+    def reset_state():
+        """Reset the application state (useful for clearing stale state)."""
+        app.config['APP_STATE']['is_running'] = False
+        app.config['APP_STATE']['repo_path'] = ''
+        app.config['APP_STATE']['process'] = None
+        return jsonify({'status': 'success', 'message': 'State reset successfully'})
     
     @app.route('/api/completeness')
     def get_completeness():

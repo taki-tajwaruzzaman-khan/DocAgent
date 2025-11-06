@@ -47,8 +47,8 @@ class BaseAgent(ABC):
         # Use agent-specific config if available, otherwise use default
         llm_config = agent_config if agent_config else config.get("llm", {})
         
-        # Verify api_key is provided in config
-        if ("api_key" not in llm_config or not llm_config["api_key"]) and (llm_config["type"] not in ["huggingface", "local"]):
+        # Verify api_key is provided in config (not needed for Bedrock, HuggingFace, or local)
+        if ("api_key" not in llm_config or not llm_config["api_key"]) and (llm_config["type"] not in ["huggingface", "local", "bedrock"]):
             raise ValueError("API key must be specified directly in the config file")
 
         # Extract LLM parameters
